@@ -100,11 +100,19 @@ def muodosta_taulukko(
             f"""
             <th onclick="sortTable({indeksi})">
                 <div>{html.escape(otsikko)}</div>
-                <input
-                    type="text"
-                    placeholder="{placeholder}"
-                    oninput="suodata()"
-                >
+                <div class="haku">
+                    <input
+                        id="haku-{indeksi}"
+                        type="text"
+                        placeholder="{placeholder}"
+                        onfocus="this.select()"
+                        oninput="suodata()"
+                    >
+                    <span
+                        class="tyhjenna"
+                        onclick="event.stopPropagation(); tyhjennaHaku(this)"
+                    >×</span>
+                </div>
             </th>
             """
         )
@@ -177,6 +185,26 @@ def muodosta_css(asetukset: TaulukkoAsetukset) -> str:
     tr:nth-child(even) {{ background: #f8f8f8; }}
     a {{ text-decoration: none; }}
     a:hover {{ text-decoration: underline; }}
+    .haku {{
+        position: relative;
+    }}
+    .haku input {{
+        width: 100%;
+        box-sizing: border-box;
+        padding-right: 18px;
+    }}
+    .tyhjenna {{
+        position: absolute;
+        right: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        font-size: 13px;
+        color: #888;
+    }}
+    .tyhjenna:hover {{
+        color: #000;
+    }}    
 
 {leveydet}
 {tasaukset}
@@ -271,7 +299,7 @@ function paivitaMaara() {{
         nakyvat
         + " / "
         + "<span id='kaikki'>"
-        + rivit.length
+        + RIVIT.length
         + "</span>"
         + " laskuriviä";
 
@@ -418,7 +446,6 @@ function sortTable(indeksi) {{
 
     
 function suodata() {{
-    console.log("SUODATA RIVIT:", RIVIT.map(rivi => rivi.tekstit[0]));
     const naytettavat = [];
 
     RIVIT.forEach(rivi => {{
@@ -485,6 +512,12 @@ function suodata() {{
         naytettavat.map(rivi => rivi.html).join("");
 
     paivitaMaara();
+}}
+
+function tyhjennaHaku(element) {{
+    const input = element.previousElementSibling;
+    input.value = "";
+    suodata();
 }}
 
 let suodatusAjastin = null;

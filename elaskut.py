@@ -536,7 +536,17 @@ def muodosta_html(laskut):
                 "data_value": lasku["paiva"],
             },
             {
-                "html": h(lasku["saaja"]),
+                "html": (
+                    f'<a href="#" '
+                    f'onclick="haeSaajanPaivalla(\'{h(lasku["paiva"])}\'); return false;">'
+                    f'{h(lasku["saaja"])}'
+                    f'</a>'
+                    if (
+                            isinstance(lasku["summa"], str)
+                            and lasku["summa"].startswith("*")
+                    )
+                    else h(lasku["saaja"])
+                ),
             },
             {
                 "html": h(lasku["aihe"]),
@@ -573,6 +583,10 @@ def muodosta_html(laskut):
 </table>
 
 <script>
+function haeSaajanPaivalla(paiva) {{
+    haut[1].value = paiva;
+    suodata();
+}}
 {muodosta_javascript(TAULUKKO, rivit_json)}
 </script>
 </body>

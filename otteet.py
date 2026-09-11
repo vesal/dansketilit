@@ -11,6 +11,8 @@ from taulukko_html import (
     muodosta_javascript
 )
 
+VERSION = "1.2.0"
+
 KANSIO = Path("./otteet")
 
 
@@ -26,6 +28,15 @@ TAULUKKO = TaulukkoAsetukset(
     summa_sarake=2,
     sarakeleveydet=[60, 100, 70, 300, 500],
 )
+
+OLETUSMAKSUTAVAT = [
+    "Verkkolaskut",
+    "Laskunmaksut/Tilisiirrot",
+    "Suoraveloitukset ja toistuvat maksut",
+    "Säästäminen ja sijoittaminen/Panot",
+    "Tulot/Pano",
+    "Korttiostot",
+]
 
 
 def lue_tapahtumat() -> list[dict]:
@@ -114,7 +125,7 @@ def lue_tapahtumat() -> list[dict]:
             for match in pattern.finditer(text):
 
                 otsikko = match.group(1)
-                if otsikko and len(otsikko) > 5:
+                if otsikko and otsikko in OLETUSMAKSUTAVAT:
                     oletus_maksutapa = otsikko.strip()
 
                 paiva = match.group(2)
