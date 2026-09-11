@@ -5,7 +5,12 @@ import html
 import xml.etree.ElementTree as eT
 
 from lasku_html import tee_lasku_html
-from taulukko_html import TaulukkoAsetukset, muodosta_taulukko, muodosta_rivit
+from taulukko_html import (
+    TaulukkoAsetukset,
+    muodosta_taulukko,
+    muodosta_rivit,
+    muodosta_javascript, muodosta_css,
+)
 
 
 # ============================================================
@@ -28,6 +33,7 @@ TAULUKKO = TaulukkoAsetukset(
     numeeriset_sarakkeet=[3],
     summa_sarake=3,
     sarakeleveydet=[110, 220, 300, 90],
+    koontirivit=True,
 )
 
 
@@ -49,17 +55,22 @@ TEKSTIKORJAUKSET = {
 # ============================================================
 
 def muotoile_paiva(paiva):
-    """Muuttaa päivämäärän muotoon YYYY-MM-DD."""
+    """
+    Muuttaa päivämäärän muotoon YYYY-MM-DD.
+    paiva voi olla muodossa DD.MM.YYYY tai YYYYMMDD.
+    Muotoilu on tarpeen, koska Dansken E-laskuissa
+    ostopäivä on DD.MM.YYYY, mutta tiedostonimessä on YYYY-MM-DD.
+    param: paiva: Päivämäärä merkkijonona.
+    return: Päivämäärä muodossa YYYY-MM-DD tai tyhjä merkkijono,
+            jos muotoilu ei onnistunut.
+    """
     if not paiva:
         return ""
 
     paiva = paiva.strip()
 
     # DD.MM.YYYY
-    match = re.fullmatch(
-        r"(\d{2})\.(\d{2})\.(\d{4})",
-        paiva,
-    )
+    match = re.fullmatch(r"(\d{2})\.(\d{2})\.(\d{4})", paiva)
 
     if match:
         paiva, kuukausi, vuosi = match.groups()
@@ -67,22 +78,27 @@ def muotoile_paiva(paiva):
 
     # YYYYMMDD
     if len(paiva) == 8 and paiva.isdigit():
-        return (
-            f"{paiva[0:4]}-"
-            f"{paiva[4:6]}-"
-            f"{paiva[6:8]}"
-        )
+        return f"{paiva[0:4]}-{paiva[4:6]}-{paiva[6:8]}"
 
     return paiva
 
 
 def tagin_nimi(tag):
-    """Palauttaa XML-tagista pelkän nimen ilman namespacea."""
+    """
+    Palauttaa XML-tagista pelkän nimen ilman namespacea.
+    param: tag: XML-tag merkkijonona.
+    return: Tagin nimi ilman namespacea.
+    """
     return tag.rsplit("}", 1)[-1]
 
 
-def etsi(element, nimi) -> Optional[eT.Element]:
-    """Etsii XML:stä ensimmäisen annetun nimisen elementin."""
+def etsi_elementti(element, nimi) -> Optional[eT.Element]:
+    """
+    Etsii XML:stä ensimmäisen annetun nimisen elementin.
+    param: element: XML-elementti.
+    param: nimi: Elementin nimi.
+    return: Etsitty elementti tai None, jos ei löydy.
+    """
     for child in element.iter():
         if tagin_nimi(child.tag) == nimi:
             return child
@@ -91,8 +107,14 @@ def etsi(element, nimi) -> Optional[eT.Element]:
 
 
 def etsi_teksti(element, nimi) -> str:
-    """Etsii annetun nimisen XML-elementin tekstin."""
-    child = etsi(element, nimi)
+    """
+    Etsii annetun nimisen XML-elementin tekstin.
+    param: element: XML-elementti.
+    param: nimi: Elementin nimi.
+    return: Elementin teksti tai tyhjä merkkijono, jos ei löydy
+            tai tekstikenttä on tyhjä.
+    """
+    child = etsi_elementti(element, nimi)
 
     if child is None or child.text is None:
         return ""
@@ -101,7 +123,11 @@ def etsi_teksti(element, nimi) -> str:
 
 
 def korjaa_teksti(teksti):
-    """Korjaa tunnetut XML:n tekstimuotovirheet."""
+    """
+    Korjaa tunnetut XML:n tekstimuotovirheet.
+    param: teksti: Korjattava teksti.
+    return: Korjattu teksti.
+    """
     teksti = (teksti or "").strip()
 
     for vanha, uusi in TEKSTIKORJAUKSET.items():
@@ -111,7 +137,11 @@ def korjaa_teksti(teksti):
 
 
 def lue_summa(teksti):
-    """Muuttaa summan numeroksi."""
+    """
+    Muuttaa summan numeroksi.
+    param: teksti: Summa merkkijonona, esim. "123,45" tai "123.45".
+    return: Summa float-tyyppisenä tai None, jos muunnos ei onnistunut.
+    """
     if not teksti:
         return None
 
@@ -135,6 +165,8 @@ def pura_tiedostonimi(polku):
 
         2026-09-28 - Pohjola Vakuutus Oy -
         Vakuutuslaskut ja re - 81.14 - .xml
+    param: polku: Tiedoston polku Path-objektina.
+    return: Tuple (paiva, saaja, aihe) merkkijonoina.
     """
 
     stem = polku.stem.rstrip()
@@ -157,6 +189,10 @@ def pura_tiedostonimi(polku):
 
 def lue_pdf_tiedostot():
     """Lukee ./pdf-hakemiston laskutiedostot."""
+    """
+    Lukee PDF-tiedostot ja palauttaa laskut tietorakenteessa.
+    return: Lista laskuista.
+    """
 
     laskut = []
 
@@ -193,9 +229,7 @@ def lue_pdf_tiedostot():
             continue
 
         # Linkki tehdään tiedostoon sellaisenaan.
-        tiedosto = (
-            Path("pdf") / polku.name
-        ).as_posix()
+        tiedosto = (Path("pdf") / polku.name).as_posix()
 
         laskut.append(
             {
@@ -215,6 +249,10 @@ def lue_pdf_tiedostot():
 # ============================================================
 
 def lue_laskut():
+    """
+    Lukee XML-tiedostot ja palauttaa laskut tietorakenteessa.
+    return: Lista laskuista.
+    """
     laskut = []
 
     xml_tiedostot = sorted(
@@ -228,37 +266,23 @@ def lue_laskut():
             juuri = eT.parse(polku).getroot()
 
         except Exception as e:
-            print(
-                f"XML-virhe tiedostossa "
-                f"{polku.name}: {e}"
-            )
+            print(f"XML-virhe tiedostossa {polku.name}: {e}")
             continue
 
         # ----------------------------------------------------
         # Tee tästä XML:stä luettava HTML-näkymä.
         # ----------------------------------------------------
 
-        html_polku = tee_lasku_html(
-            polku,
-            HTML_HAKEMISTO,
-        )
+        html_polku = tee_lasku_html(polku, HTML_HAKEMISTO,)
 
-        filename_paiva, filename_saaja, filename_aihe = (
-            pura_tiedostonimi(polku)
-        )
+        filename_paiva, filename_saaja, filename_aihe = (pura_tiedostonimi(polku))
 
         seller_name = korjaa_teksti(
-            etsi_teksti(
-                juuri,
-                "SellerOrganisationName",
-            )
+            etsi_teksti(juuri, "SellerOrganisationName")
         )
 
         invoice_total = lue_summa(
-            etsi_teksti(
-                juuri,
-                "InvoiceTotalVatIncludedAmount",
-            )
+            etsi_teksti(juuri, "InvoiceTotalVatIncludedAmount")
         )
 
         invoice_rows = [
@@ -276,34 +300,19 @@ def lue_laskut():
         for row in invoice_rows:
 
             article_name = korjaa_teksti(
-                etsi_teksti(
-                    row,
-                    "ArticleName",
-                )
+                etsi_teksti(row, "ArticleName")
             )
 
-            row_free_text = etsi_teksti(
-                row,
-                "RowFreeText",
-            )
+            row_free_text = etsi_teksti(row, "RowFreeText")
 
             # Järjestys:
             # 1. RowVatIncludedAmount
             # 2. RowVatExcludedAmount
             # 3. RowAmount
             summa = lue_summa(
-                etsi_teksti(
-                    row,
-                    "RowVatIncludedAmount",
-                )
-                or etsi_teksti(
-                    row,
-                    "RowVatExcludedAmount",
-                )
-                or etsi_teksti(
-                    row,
-                    "RowAmount",
-                )
+                etsi_teksti(row, "RowVatIncludedAmount")
+                or etsi_teksti(row, "RowVatExcludedAmount")
+                or etsi_teksti(row, "RowAmount")
             )
 
             # Ei ArticleNamea -> ei hyödyllinen rivi.
@@ -327,7 +336,7 @@ def lue_laskut():
             if summa is None:
                 continue
 
-            # ------------------------------------------------
+            # ----------------------------------------------------
             # Ostopäivä RowFreeText-kentästä.
             # ------------------------------------------------
 
@@ -348,9 +357,7 @@ def lue_laskut():
                 )
 
                 if match:
-                    ostopaiva = muotoile_paiva(
-                        match.group(1)
-                    )
+                    ostopaiva = muotoile_paiva(match.group(1))
                     break
 
             rivit.append(
@@ -373,9 +380,7 @@ def lue_laskut():
         # Dansken E-lasku-kokonaissumma.
         # ----------------------------------------------------
 
-        onko_danske = (
-            seller_name == "Danske Bank"
-        )
+        onko_danske = (seller_name == "Danske Bank")
 
         elasku_rivi = None
 
@@ -387,10 +392,7 @@ def lue_laskut():
                     elasku_rivi = rivi
                     break
 
-        if (
-            elasku_rivi is not None
-            and invoice_total is not None
-        ):
+        if elasku_rivi is not None and invoice_total is not None:
 
             aihe = filename_aihe
 
@@ -421,27 +423,18 @@ def lue_laskut():
             article_name = rivi["article_name"]
 
             # Dansken E-lasku-rivi käsiteltiin jo yllä.
-            if (
-                onko_danske
-                and article_name == "E-lasku"
-            ):
+            if onko_danske and article_name == "E-lasku":
                 continue
 
             summa = rivi["summa"]
 
             saaja = filename_saaja
 
-            if (
-                    onko_danske
-                    and rivi["ostopaiva"]
-            ):
+            if onko_danske and rivi["ostopaiva"]:
                 saaja = f"{filename_saaja} - {filename_paiva}"
 
             if filename_aihe and article_name:
-                aihe = (
-                    f"{filename_aihe} / "
-                    f"{article_name}"
-                )
+                aihe = f"{filename_aihe} / {article_name}"
 
             elif article_name:
                 aihe = article_name
@@ -453,10 +446,7 @@ def lue_laskut():
 
             # Dansken korttilaskuissa käytetään
             # ostotapahtuman todellista ostopäivää.
-            if (
-                onko_danske
-                and rivi["ostopaiva"]
-            ):
+            if onko_danske and rivi["ostopaiva"]:
                 paiva = rivi["ostopaiva"]
 
             laskut.append(
@@ -476,9 +466,7 @@ def lue_laskut():
     # Lisätään ./pdf-hakemiston tiedostot.
     # --------------------------------------------------------
 
-    laskut.extend(
-        lue_pdf_tiedostot()
-    )
+    laskut.extend(lue_pdf_tiedostot())
 
     # Uusin laskurivi ensin.
     return sorted(
@@ -493,12 +481,20 @@ def lue_laskut():
 # ============================================================
 
 def h(text):
-    """HTML-escape."""
+    """
+    HTML-escape.
+    param: text: Merkkijono, joka halutaan escape:ata.
+    return: Escape:attu merkkijono.
+    """
     return html.escape(str(text or ""))
 
 
 def rahaksi(summa):
-    """Muuttaa summan kahden desimaalin tekstiksi."""
+    """
+    Muuttaa summan kahden desimaalin tekstiksi.
+    param: summa: Summa float-tyyppisenä.
+    return: Summa kahden desimaalin tekstiksi.
+    """
     if summa is None:
         return ""
 
@@ -510,6 +506,11 @@ def rahaksi(summa):
 # ============================================================
 
 def muodosta_html(laskut):
+    """
+    Muodostaa laskulistan HTML-muotoon.
+    param: laskut: Lista laskuista.
+    return: HTML-koodi.
+    """
     otsikot, leveydet = muodosta_taulukko(TAULUKKO)
 
     rivit = []
@@ -550,82 +551,13 @@ def muodosta_html(laskut):
 
     return f"""<!DOCTYPE html>
 <html lang="fi">
-
 <head>
-
 <meta charset="UTF-8">
-
 <title>E-laskut</title>
-
 <style>
-
-body {{
-    font-family: Arial, sans-serif;
-    margin: 20px;
-}}
-
-table {{
-    border-collapse: collapse;
-    width: auto;
-    table-layout: fixed;
-}}
-
-th,
-td {{
-    border: 1px solid #bbb;
-    padding: 4px 6px;
-    text-align: left;
-    vertical-align: top;
-}}
-
-th {{
-    position: sticky;
-    top: 0;
-    background: white;
-    z-index: 2;
-    cursor: pointer;
-    user-select: none;
-}}
-
-th:hover {{
-    background: #eee;
-}}
-
-th input {{
-    box-sizing: border-box;
-    display: block;
-    width: 100%;
-    margin-top: 4px;
-    padding: 2px 4px;
-    font-size: inherit;
-    font-weight: normal;
-    cursor: text;
-}}
-
-{leveydet}
-
-#maara {{
-    margin-bottom: 8px;
-    font-size: 16px;
-}}
-
-#summa {{
-    margin-left: 30px;
-}}
-
-#kaikki {{
-    cursor: pointer;
-    text-decoration: underline;
-}}
-
-#kaikki:hover {{
-    background: #eee;
-}}
-
+{muodosta_css(TAULUKKO)}
 </style>
 </head>
-
-
 <body>
 <div id="maara">
     <span id="laskurivimaara"></span>
@@ -641,416 +573,9 @@ th input {{
 </table>
 
 <script>
-
-const taulu =
-    document.getElementById("laskut");
-
-const tbody =
-    taulu.querySelector("tbody");
-
-const haut =
-    taulu.querySelectorAll(
-        "thead input"
-    );
-
-const laskurivimaara =
-    document.getElementById(
-        "laskurivimaara"
-    );
-
-const summa =
-    document.getElementById("summa");
-
-
-// ==========================================================
-// Summan näyttäminen
-// ==========================================================
-
-function rahaksi(arvo) {{
-
-    return arvo.toLocaleString(
-        "fi-FI",
-        {{
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }}
-    );
-}}
-
-laskurivimaara.addEventListener(
-    "click",
-    event => {{
-        if (event.target.id === "kaikki") {{
-            location.reload();
-        }}
-    }}
-);
-
-function paivitaMaara() {{
-
-    const rivit = tbody.querySelectorAll("tr");
-
-    let nakyvat = 0;
-    let yhteensa = 0;
-
-    const summaEhto = haut[SUMMA_SARAKE].value.trim();
-    const laskeKoontirivit = summaEhto.startsWith("*");
-
-    rivit.forEach(rivi => {{
-
-        if (rivi.style.display !== "none") {{
-            nakyvat++;
-            const solu = rivi.cells[SUMMA_SARAKE];
-            const arvo = parseFloat(solu.dataset.value);
-
-            if (
-                (!solu.textContent.trim().startsWith("*") ||
-                laskeKoontirivit) &&
-                !Number.isNaN(arvo)
-            ) {{
-                yhteensa += arvo;
-            }}
-        }}
-    }});
-
-
-    laskurivimaara.innerHTML =
-        nakyvat
-        + " / "
-        + "<span id='kaikki'>"
-        + rivit.length
-        + "</span>"
-        + " laskuriviä";
-
-    summa.textContent =
-        "Summa: "
-        + rahaksi(yhteensa)
-        + " €";
-}}
-
-
-// ==========================================================
-// Summan ehtohaku
-//
-// Esimerkiksi:
-//
-//   =10
-//   >10
-//   >=10
-//   <10
-//   <=10
-//   >=5<=20
-//
-// ==========================================================
-
-function ehtoTäsmää(arvo, ehto, numeerinen) {{
-
-    ehto = ehto.trim();
-
-    // Ei ehtoa -> kutsuja käsittelee tämän regexpinä.
-    if (!/^[<>=]/.test(ehto))
-        return null;
-
-    const osumat = [
-        ...ehto.matchAll(
-            /(<=|>=|=|<|>)\\s*([^<>=\\s]+)/g
-        )
-    ];
-    
-    if (typeof arvo === "string") {{
-        arvo = arvo.toLowerCase().trim();
-    }}
-
-    ehto = ehto.toLowerCase().trim();
-
-    const koottu =
-        osumat.map(osuma => osuma[0]).join("");
-
-    if (
-        !osumat.length ||
-        koottu.replace(/\\s/g, "") !==
-        ehto.replace(/\\s/g, "")
-    )
-        return false;
-
-    for (const osuma of osumat) {{
-
-        const operaattori = osuma[1];
-        let raja = osuma[2];
-
-        if (numeerinen) {{
-            raja = parseFloat(
-                raja.replace(",", ".")
-            );
-
-            if (Number.isNaN(raja))
-                return false;
-        }}
-
-        if (operaattori === "<" && !(arvo < raja))
-            return false;
-
-        if (operaattori === "<=" && !(arvo <= raja))
-            return false;
-
-        if (operaattori === "=" && !(arvo === raja))
-            return false;
-
-        if (operaattori === ">" && !(arvo > raja))
-            return false;
-
-        if (operaattori === ">=" && !(arvo >= raja))
-            return false;
-    }}
-
-    return true;
-}}
-
-// ==========================================================
-// Suodatus
-// ==========================================================
-
-const NUMEERISET_SARAKKEET = new Set({TAULUKKO.numeeriset_sarakkeet});
-const SUMMA_SARAKE = {TAULUKKO.summa_sarake};
-
-function suodata() {{
-    const rivit = tbody.querySelectorAll("tr");
-
-    rivit.forEach(rivi => {{
-        const solut = rivi.querySelectorAll("td");
-        let nayta = true;
-
-        haut.forEach((haku, indeksi) => {{
-            if (!nayta)
-                return;
-
-            let ehto = haku.value.trim();
-
-            if (!ehto)
-                return;
-
-            const teksti =
-                solut[indeksi].textContent.trim();
-
-            let vainKoontirivit = false;
-
-            if (
-                indeksi === SUMMA_SARAKE &&
-                ehto.startsWith("*")
-            ) {{
-                vainKoontirivit = true;
-                ehto = ehto.substring(1).trim();
-
-                if (!teksti.startsWith("*")) {{
-                    nayta = false;
-                    return;
-                }}
-            }}
-
-            const numeerinen =
-                NUMEERISET_SARAKKEET.has(indeksi);
-
-            const arvo = numeerinen
-                ? parseFloat(
-                    solut[indeksi].dataset.value
-                )
-                : teksti;
-
-            // Pelkkä "*" tarkoittaa:
-            // kaikki koontirivit.
-            if (!ehto && vainKoontirivit)
-                return;
-
-            const tulos = ehtoTäsmää(
-                arvo,
-                ehto,
-                numeerinen
-            );
-
-            if (tulos !== null) {{
-                if (!tulos)
-                    nayta = false;
-
-                return;
-            }}
-
-            try {{
-                const regex =
-                    new RegExp(ehto, "i");
-
-                if (!regex.test(teksti))
-                    nayta = false;
-
-            }} catch (virhe) {{
-                if (!teksti.toLowerCase().includes(
-                    ehto.toLowerCase()
-                ))
-                    nayta = false;
-            }}
-        }});
-
-        rivi.style.display =
-            nayta ? "" : "none";
-    }});
-
-    paivitaMaara();
-}}
-
-
-// ==========================================================
-// Hakukentät
-// ==========================================================
-
-haut.forEach(haku => {{
-
-    haku.addEventListener(
-        "input",
-        suodata
-    );
-
-
-    haku.addEventListener(
-        "click",
-        event => {{
-            event.stopPropagation();
-        }}
-    );
-}});
-
-
-// ==========================================================
-// Lajittelu
-// ==========================================================
-
-let suunnat = [
-    1,
-    1,
-    1,
-    1
-];
-
-
-taulu
-    .querySelectorAll("thead th")
-    .forEach(
-        (otsikko, indeksi) => {{
-
-            otsikko.addEventListener(
-                "click",
-                () => {{
-
-                    const rivit =
-                        Array.from(
-                            tbody.querySelectorAll(
-                                "tr"
-                            )
-                        );
-
-
-                    rivit.sort(
-                        (a, b) => {{
-
-                            const aSolut =
-                                a.querySelectorAll(
-                                    "td"
-                                );
-
-                            const bSolut =
-                                b.querySelectorAll(
-                                    "td"
-                                );
-
-
-                            // Summa lajitellaan
-                            // numerona.
-                            if (NUMEERISET_SARAKKEET.has(indeksi)) {{
-                            
-                                const av =
-                                    parseFloat(
-                                        aSolut[indeksi].dataset.value
-                                    );
-                            
-                                const bv =
-                                    parseFloat(
-                                        bSolut[indeksi].dataset.value
-                                    );
-                            
-                                const aOnNumero = !Number.isNaN(av);
-                                const bOnNumero = !Number.isNaN(bv);
-                            
-                                if (aOnNumero && !bOnNumero)
-                                    return -1;
-                            
-                                if (!aOnNumero && bOnNumero)
-                                    return 1;
-                            
-                                if (!aOnNumero && !bOnNumero)
-                                    return 0;
-                            
-                                return (
-                                    (av - bv)
-                                    * suunnat[indeksi]
-                                );
-                            }}
-
-                            // Muut sarakkeet tekstinä.
-                            const av =
-                                aSolut[indeksi]
-                                    .textContent
-                                    .trim();
-
-
-                            const bv =
-                                bSolut[indeksi]
-                                    .textContent
-                                    .trim();
-
-
-                            return (
-                                av.localeCompare(
-                                    bv,
-                                    "fi",
-                                    {{
-                                        numeric: true,
-                                        sensitivity: "base"
-                                    }}
-                                )
-                                *
-                                suunnat[indeksi]
-                            );
-                        }}
-                    );
-
-
-                    suunnat[indeksi] *= -1;
-
-
-                    rivit.forEach(
-                        rivi =>
-                            tbody.appendChild(rivi)
-                    );
-
-
-                    // Lajittelu ei muuta näkyvien
-                    // rivien määrää tai summaa,
-                    // mutta päivitetään varmuuden vuoksi.
-                    paivitaMaara();
-                }}
-            );
-        }}
-    );
-
-
-// ==========================================================
-// Alkuperäinen näyttö
-// ==========================================================
-
-paivitaMaara();
-
+{muodosta_javascript(TAULUKKO, rivit_json)}
 </script>
-
 </body>
-
 </html>
 """
 
@@ -1060,42 +585,22 @@ paivitaMaara();
 # ============================================================
 
 def main():
-
-    print(
-        f"E-laskut {VERSION}"
-    )
-
-    print(
-        "Luetaan XML-tiedostot:"
-    )
-
-    print(
-        Path.cwd()
-    )
-
+    print(f"E-laskut {VERSION}")
+    print("Luetaan XML-tiedostot:")
+    print(Path.cwd())
     print()
 
     laskut = lue_laskut()
 
     print()
-
-    print(
-        f"Luettu {len(laskut)} laskuriviä."
-    )
+    print(f"Luettu {len(laskut)} laskuriviä.")
 
     html_teksti = muodosta_html(laskut)
 
-    TULOSTIEDOSTO.write_text(
-        html_teksti,
-        encoding="utf-8",
-    )
+    TULOSTIEDOSTO.write_text(html_teksti, encoding="utf-8")
 
     print()
-
-    print(
-        f"Kirjoitettu: "
-        f"{TULOSTIEDOSTO.resolve()}"
-    )
+    print(f"Kirjoitettu: "f"{TULOSTIEDOSTO.resolve()}")
 
 
 if __name__ == "__main__":

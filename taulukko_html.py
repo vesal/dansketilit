@@ -21,6 +21,7 @@ class TaulukkoAsetukset:
     numeeriset_sarakkeet: list[int]
     summa_sarake: int
     sarakeleveydet: list[int]
+    koontirivit: bool = False
 
 
 def muodosta_rivit(
@@ -128,38 +129,57 @@ def muodosta_taulukko(
     return otsikot, leveydet
 
 
-def muodosta_css() -> str:
+def muodosta_css(asetukset: TaulukkoAsetukset) -> str:
     """
     Muodostaa taulukon yhteisen CSS:n.
 
+    :param asetukset: Taulukon asetukset.
     :return: Taulukon CSS-tyylit.
     """
 
-    return """
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h1 { margin-bottom: 5px; }
-    .info { color: #666; margin-bottom: 15px; }
-    table {
+    leveydet = "\n".join(
+        f"    th:nth-child({i + 1}), td:nth-child({i + 1}) {{ width: {leveys}px; }}"
+        for i, leveys in enumerate(asetukset.sarakeleveydet)
+    )
+
+    tasaukset = "\n".join(
+        f"""
+        th:nth-child({indeksi + 1}),
+        td:nth-child({indeksi + 1}) {{
+            text-align: right;
+        }}
+        """
+        for indeksi in asetukset.numeeriset_sarakkeet
+    )
+
+    return f"""
+    body {{ font-family: Arial, sans-serif; margin: 20px; }}
+    h1 {{ margin-bottom: 5px; }}
+    .info {{ color: #666; margin-bottom: 15px; }}
+    table {{
         border-collapse: collapse;
         table-layout: fixed;
-        width: 100%;
-    }
-    th {
+        width: fit-content;
+    }}
+    th {{
         cursor: pointer;
         background: #eee;
         position: sticky;
         top: 0;
-    }
-    th, td {
+    }}
+    th, td {{
         border: 1px solid #ccc;
         padding: 5px 8px;
         text-align: left;
         overflow: hidden;
-    }
-    th:hover { background: #ddd; }
-    tr:nth-child(even) { background: #f8f8f8; }
-    a { text-decoration: none; }
-    a:hover { text-decoration: underline; }
+    }}
+    th:hover {{ background: #ddd; }}
+    tr:nth-child(even) {{ background: #f8f8f8; }}
+    a {{ text-decoration: none; }}
+    a:hover {{ text-decoration: underline; }}
+
+{leveydet}
+{tasaukset}
     """
 
 
@@ -174,13 +194,12 @@ def muodosta_javascript(asetukset: TaulukkoAsetukset, rivit_json: str) -> str:
 
     numeeriset = asetukset.numeeriset_sarakkeet
     summa_sarake = asetukset.summa_sarake
+    koontirivit_js = str(asetukset.koontirivit).lower()
 
     rivit_js = rivit_json
 
     return f"""
     const RIVIT = {rivit_js};
-    
-    RIVIT.sort((a, b) =>  b.arvot[1].localeCompare(a.arvot[1]));
     
     const taulu = document.getElementById("laskut");
     const haut = taulu.querySelectorAll("thead input");
@@ -191,6 +210,7 @@ def muodosta_javascript(asetukset: TaulukkoAsetukset, rivit_json: str) -> str:
     
     const NUMEERISET_SARAKKEET = new Set({numeeriset});
     const SUMMA_SARAKE = {summa_sarake};
+    const KOONTIRIVIT = {koontirivit_js};
 
 // ==========================================================
 // Summan näyttäminen
@@ -224,7 +244,7 @@ function paivitaMaara() {{
     let yhteensa = 0;
 
     const summaEhto = haut[SUMMA_SARAKE].value.trim();
-    const laskeKoontirivit = summaEhto.startsWith("*");
+    const laskeKoontirivit = KOONTIRIVIT && summaEhto.startsWith("*");
 
     rivit.forEach(rivi => {{
 
@@ -234,8 +254,11 @@ function paivitaMaara() {{
             const arvo = parseFloat(solu.dataset.value);
 
             if (
-                (!solu.textContent.trim().startsWith("*") ||
-                laskeKoontirivit) &&
+                (
+                    !KOONTIRIVIT ||
+                    !solu.textContent.trim().startsWith("*") ||
+                    laskeKoontirivit
+                ) &&
                 !Number.isNaN(arvo)
             ) {{
                 yhteensa += arvo;
@@ -394,92 +417,99 @@ function sortTable(indeksi) {{
 }}
 
     
-    function suodata() {{
-        const naytettavat = [];
-    
-        RIVIT.forEach(rivi => {{
-            let nayta = true;
-    
-            haut.forEach((haku, indeksi) => {{
-                if (!nayta)
-                    return;
-    
-                let ehto = haku.value.trim();
-    
-                if (!ehto)
-                    return;
-    
-                const teksti =
-                    rivi.tekstit[indeksi].trim();
-    
-                const numeerinen =
-                    NUMEERISET_SARAKKEET.has(indeksi);
-    
-                const arvo = numeerinen
-                    ? parseFloat(rivi.arvot[indeksi])
-                    : teksti;
-    
-                const tulos = ehtoTäsmää(
-                    arvo,
-                    ehto,
-                    numeerinen
-                );
-    
-                if (tulos !== null) {{
-                    if (!tulos)
-                        nayta = false;
-    
+function suodata() {{
+    console.log("SUODATA RIVIT:", RIVIT.map(rivi => rivi.tekstit[0]));
+    const naytettavat = [];
+
+    RIVIT.forEach(rivi => {{
+        let nayta = true;
+
+        haut.forEach((haku, indeksi) => {{
+            if (!nayta) return;
+
+            let ehto = haku.value.trim();
+
+            if (!ehto) return;
+
+            const teksti = rivi.tekstit[indeksi].trim();
+
+            if (
+                KOONTIRIVIT &&
+                indeksi === SUMMA_SARAKE &&
+                ehto.startsWith("*")
+            ) {{
+                ehto = ehto.substring(1).trim();
+                if (!teksti.startsWith("*")) {{
+                    nayta = false;
                     return;
                 }}
-    
-                try {{
-                    const regex =
-                        new RegExp(ehto, "i");
-    
-                    if (!regex.test(teksti))
-                        nayta = false;
-    
-                }} catch (virhe) {{
-                    if (!teksti.toLowerCase().includes(
-                        ehto.toLowerCase()
-                    ))
-                        nayta = false;
-                }}
-            }});
-    
-            if (nayta)
-                naytettavat.push(rivi);
+                if (!ehto) return;
+            }}
+            
+            if (!ehto && vainKoontirivit) return;
+                
+            const numeerinen =  NUMEERISET_SARAKKEET.has(indeksi);
+            const arvo = numeerinen
+                ? parseFloat(rivi.arvot[indeksi])
+                : teksti;
+
+            const tulos = ehtoTäsmää(arvo, ehto, numeerinen);
+
+            if (tulos !== null) {{
+                if (!tulos)
+                    nayta = false;
+
+                return;
+            }}
+
+            try {{
+                const regex =
+                    new RegExp(ehto, "i");
+
+                if (!regex.test(teksti))
+                    nayta = false;
+
+            }} catch (virhe) {{
+                if (!teksti.toLowerCase().includes(
+                    ehto.toLowerCase()
+                ))
+                    nayta = false;
+            }}
         }});
+
+        if (nayta)
+            naytettavat.push(rivi);
+    }});
+
+    tbody.innerHTML =
+        naytettavat.map(rivi => rivi.html).join("");
+
+    paivitaMaara();
+}}
+
+let suodatusAjastin = null;
+
+haut.forEach(haku => {{
+
+    haku.addEventListener(
+        "input",
+        () => {{
+            clearTimeout(suodatusAjastin);
+
+            suodatusAjastin = setTimeout(
+                suodata,
+                100
+            );
+        }}
+    );  
     
-        tbody.innerHTML =
-            naytettavat.map(rivi => rivi.html).join("");
-    
-        paivitaMaara();
-    }}
-    
-    let suodatusAjastin = null;
-    
-    haut.forEach(haku => {{
-    
-        haku.addEventListener(
-            "input",
-            () => {{
-                clearTimeout(suodatusAjastin);
-    
-                suodatusAjastin = setTimeout(
-                    suodata,
-                    100
-                );
-            }}
-        );  
-        
-        haku.addEventListener(
-            "click",
-            event => {{
-                event.stopPropagation();
-            }}
-        );
-    }});    
-    
-    paivitaMaara();  
-    """
+    haku.addEventListener(
+        "click",
+        event => {{
+            event.stopPropagation();
+        }}
+    );
+}});    
+
+paivitaMaara();  
+"""

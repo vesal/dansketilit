@@ -24,7 +24,7 @@ TAULUKKO = TaulukkoAsetukset(
     ],
     numeeriset_sarakkeet=[2],
     summa_sarake=2,
-    sarakeleveydet=[60, 60, 60, 300, 400],
+    sarakeleveydet=[60, 100, 70, 300, 500],
 )
 
 
@@ -280,8 +280,7 @@ def muodosta_html(tulokset: list[dict]) -> None:
 <title>Tiliotteet</title>
 
 <style>
-{muodosta_css()}
-{leveydet}
+{muodosta_css(TAULUKKO)}
 </style>
 </head>
 <body>
