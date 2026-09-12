@@ -5,6 +5,14 @@ from dataclasses import dataclass
 import html
 from typing import Any
 
+"""
+HTML-taulukon muodostamiseen liittyviä aputoimintoja.
+
+Copyright (c) 2026 vesal & ChatGPT. All rights reserved.
+"""
+
+VERSION = "1.0.2"
+
 
 @dataclass(frozen=True)
 class TaulukkoAsetukset:
@@ -15,6 +23,7 @@ class TaulukkoAsetukset:
     :param numeeriset_sarakkeet: Numeeristen sarakkeiden indeksit.
     :param summa_sarake: Summan sisältävän sarakkeen indeksi.
     :param sarakeleveydet: Sarakkeiden leveydet pikseleinä.
+    :param koontirivit: Onko taulukossa koontirivejä.
     """
 
     sarakkeet: list[str]
@@ -52,18 +61,12 @@ def muodosta_rivit(
             else:
                 solut_html.append(f"<td>{solu_html}</td>")
 
-            teksti = html.unescape(
-                re.sub(r"<[^>]*>", "", solu_html)
-            )
+            teksti = html.unescape(re.sub(r"<[^>]*>", "", solu_html))
             tekstit.append(teksti)
 
-            arvot.append(
-                str(solu.get("data_value", teksti))
-            )
+            arvot.append(str(solu.get("data_value", teksti)))
 
-        html_rivit.append(
-            "<tr>" + "".join(solut_html) + "</tr>"
-        )
+        html_rivit.append("<tr>" + "".join(solut_html) + "</tr>")
 
         js_rivit.append({
             "tekstit": tekstit,
@@ -127,13 +130,10 @@ def muodosta_taulukko(
     for indeksi in asetukset.numeeriset_sarakkeet:
         sarake = indeksi + 1
 
-        leveydet += f"""
-        th:nth-child({sarake}),
-        td:nth-child({sarake}) {{
+        leveydet += f"""th:nth-child({sarake}), td:nth-child({sarake}) {{
             text-align: right;
         }}
         """
-
     return otsikot, leveydet
 
 
@@ -151,9 +151,7 @@ def muodosta_css(asetukset: TaulukkoAsetukset) -> str:
     )
 
     tasaukset = "\n".join(
-        f"""
-        th:nth-child({indeksi + 1}),
-        td:nth-child({indeksi + 1}) {{
+        f"""th:nth-child({indeksi + 1}), td:nth-child({indeksi + 1}) {{
             text-align: right;
         }}
         """
@@ -169,11 +167,22 @@ def muodosta_css(asetukset: TaulukkoAsetukset) -> str:
         table-layout: fixed;
         width: fit-content;
     }}
-    th {{
-        cursor: pointer;
-        background: #eee;
+    .sticky-header {{
         position: sticky;
         top: 0;
+        background: white;
+        z-index: 10;
+    }}
+
+    thead {{
+        position: sticky;
+        top: calc(var(--sticky-header-height) - 2px);
+        z-index: 10;
+        background: #eee;
+    }}
+        
+    th {{
+        cursor: pointer;
     }}
     th, td {{
         border: 1px solid #ccc;
@@ -245,19 +254,14 @@ def muodosta_javascript(asetukset: TaulukkoAsetukset, rivit_json: str) -> str:
 // ==========================================================
 
 function rahaksi(arvo) {{
-
-    return arvo.toLocaleString(
-        "fi-FI",
-        {{
+    return arvo.toLocaleString("fi-FI", {{
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         }}
     );
 }}
 
-laskurivimaara.addEventListener(
-    "click",
-    event => {{
+laskurivimaara.addEventListener("click", event => {{
         if (event.target.id === "kaikki") {{
             location.reload();
         }}
@@ -265,7 +269,6 @@ laskurivimaara.addEventListener(
 );
 
 function paivitaMaara() {{
-
     const rivit = tbody.querySelectorAll("tr");
 
     let nakyvat = 0;
@@ -275,7 +278,6 @@ function paivitaMaara() {{
     const laskeKoontirivit = KOONTIRIVIT && summaEhto.startsWith("*");
 
     rivit.forEach(rivi => {{
-
         if (rivi.style.display !== "none") {{
             nakyvat++;
             const solu = rivi.cells[SUMMA_SARAKE];
@@ -311,7 +313,7 @@ function paivitaMaara() {{
 
 
 // ==========================================================
-// Summan ehtohaku
+// Epäyhtälöiden käsittely
 //
 // Esimerkiksi:
 //
@@ -325,12 +327,10 @@ function paivitaMaara() {{
 // ==========================================================
 
 function ehtoTäsmää(arvo, ehto, numeerinen) {{
-
-    ehto = ehto.trim();
+    ehto = ehto.toLowerCase().trim();
 
     // Ei ehtoa -> kutsuja käsittelee tämän regexpinä.
-    if (!/^[<>=]/.test(ehto))
-        return null;
+    if (!/^[<>=]/.test(ehto)) return null;
 
     const osumat = [
         ...ehto.matchAll(
@@ -338,50 +338,29 @@ function ehtoTäsmää(arvo, ehto, numeerinen) {{
         )
     ];
     
-    if (typeof arvo === "string") {{
-        arvo = arvo.toLowerCase().trim();
-    }}
-
-    ehto = ehto.toLowerCase().trim();
-
-    const koottu =
-        osumat.map(osuma => osuma[0]).join("");
+    if (typeof arvo === "string") arvo = arvo.trim().toLowerCase();
+    const koottu = osumat.map(osuma => osuma[0]).join("");
 
     if (
         !osumat.length ||
         koottu.replace(/\\s/g, "") !==
         ehto.replace(/\\s/g, "")
-    )
-        return false;
+    ) return false;
 
     for (const osuma of osumat) {{
-
         const operaattori = osuma[1];
-        let raja = osuma[2];
+        let raja = osuma[2].trim().toLowerCase();
 
         if (numeerinen) {{
-            raja = parseFloat(
-                raja.replace(",", ".")
-            );
-
-            if (Number.isNaN(raja))
-                return false;
+            raja = parseFloat(raja.replace(",", "."));
+            if (Number.isNaN(raja)) return false;
         }}
 
-        if (operaattori === "<" && !(arvo < raja))
-            return false;
-
-        if (operaattori === "<=" && !(arvo <= raja))
-            return false;
-
-        if (operaattori === "=" && !(arvo === raja))
-            return false;
-
-        if (operaattori === ">" && !(arvo > raja))
-            return false;
-
-        if (operaattori === ">=" && !(arvo >= raja))
-            return false;
+        if (operaattori === "<" && !(arvo < raja)) return false;
+        if (operaattori === "<=" && !(arvo <= raja)) return false;
+        if (operaattori === "=" && !(arvo === raja)) return false;
+        if (operaattori === ">" && !(arvo > raja)) return false;
+        if (operaattori === ">=" && !(arvo >= raja)) return false;
     }}
 
     return true;
@@ -393,8 +372,10 @@ function haeRivit() {{
     return Array.from(table.tBodies[0].rows);
 }}
 
+
 let lajitteluSarake = -1;
 let lajitteluKaanteinen = false;
+
 
 function sortTable(indeksi) {{
     if (lajitteluSarake === indeksi) {{
@@ -405,9 +386,7 @@ function sortTable(indeksi) {{
     }}
 
     const rivit = [...RIVIT];
-
-    const numeerinen =
-        NUMEERISET_SARAKKEET.has(indeksi);
+    const numeerinen = NUMEERISET_SARAKKEET.has(indeksi);
 
     rivit.sort((a, b) => {{
         let arvoA = a.arvot[indeksi];
@@ -416,22 +395,15 @@ function sortTable(indeksi) {{
         if (numeerinen) {{
             arvoA = parseFloat(arvoA);
             arvoB = parseFloat(arvoB);
-
-            if (Number.isNaN(arvoA))
-                arvoA = 0;
-
-            if (Number.isNaN(arvoB))
-                arvoB = 0;
+            if (Number.isNaN(arvoA)) arvoA = 0;
+            if (Number.isNaN(arvoB)) arvoB = 0;
         }} else {{
             arvoA = String(arvoA).toLowerCase();
             arvoB = String(arvoB).toLowerCase();
         }}
 
-        if (arvoA < arvoB)
-            return lajitteluKaanteinen ? 1 : -1;
-
-        if (arvoA > arvoB)
-            return lajitteluKaanteinen ? -1 : 1;
+        if (arvoA < arvoB) return lajitteluKaanteinen ? 1 : -1;
+        if (arvoA > arvoB) return lajitteluKaanteinen ? -1 : 1;
 
         return 0;
     }});
@@ -439,8 +411,6 @@ function sortTable(indeksi) {{
     RIVIT.length = 0;
     RIVIT.push(...rivit);
 
-    // tbody.innerHTML =
-    //    RIVIT.map(rivi => rivi.html).join("");
     suodata();
 }}
 
@@ -454,11 +424,10 @@ function suodata() {{
         haut.forEach((haku, indeksi) => {{
             if (!nayta) return;
 
-            let ehto = haku.value.trim();
-
+            let ehto = haku.value.trim().toLowerCase();
             if (!ehto) return;
 
-            const teksti = rivi.tekstit[indeksi].trim();
+            const teksti = rivi.tekstit[indeksi].trim().toLowerCase();
 
             if (
                 KOONTIRIVIT &&
@@ -483,36 +452,25 @@ function suodata() {{
             const tulos = ehtoTäsmää(arvo, ehto, numeerinen);
 
             if (tulos !== null) {{
-                if (!tulos)
-                    nayta = false;
-
+                if (!tulos) nayta = false;
                 return;
             }}
 
             try {{
-                const regex =
-                    new RegExp(ehto, "i");
-
-                if (!regex.test(teksti))
-                    nayta = false;
-
+                const regex = new RegExp(ehto, "i");
+                if (!regex.test(teksti)) nayta = false;
             }} catch (virhe) {{
-                if (!teksti.toLowerCase().includes(
-                    ehto.toLowerCase()
-                ))
-                    nayta = false;
+                if (!teksti.includes(ehto)) nayta = false;
             }}
         }});
 
-        if (nayta)
-            naytettavat.push(rivi);
+        if (nayta) naytettavat.push(rivi);
     }});
 
-    tbody.innerHTML =
-        naytettavat.map(rivi => rivi.html).join("");
-
+    tbody.innerHTML = naytettavat.map(rivi => rivi.html).join("");
     paivitaMaara();
 }}
+
 
 function tyhjennaHaku(element) {{
     const input = element.previousElementSibling;
@@ -520,29 +478,23 @@ function tyhjennaHaku(element) {{
     suodata();
 }}
 
+
 let suodatusAjastin = null;
 
 haut.forEach(haku => {{
-
-    haku.addEventListener(
-        "input",
-        () => {{
+    haku.addEventListener("input", () => {{
             clearTimeout(suodatusAjastin);
-
-            suodatusAjastin = setTimeout(
-                suodata,
-                100
-            );
+            suodatusAjastin = setTimeout(suodata, 100);
         }}
     );  
     
-    haku.addEventListener(
-        "click",
-        event => {{
-            event.stopPropagation();
-        }}
-    );
+    haku.addEventListener("click", event => {{ event.stopPropagation(); }});
 }});    
 
 paivitaMaara();  
+const sticky_header = document.querySelector(".sticky-header");
+document.documentElement.style.setProperty(
+    "--sticky-header-height",
+    `${{sticky_header.offsetHeight}}px`
+);
 """

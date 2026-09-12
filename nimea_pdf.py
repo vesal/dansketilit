@@ -2,6 +2,16 @@
 from pathlib import Path
 import re
 
+"""
+Nimeämiskäytäntöjen mukaisen PDF-tiedostojen nimeämiseen liittyvät funktiot.
+
+Vaihtaa elaskujen PDF-tiedostojen edellisen nimeämistavan
+mukaiset nimet samaan muotoon kuin XML-laskujen nimet, eli
+muotoon: "YYYY-MM-DD - Saaja - Aihe - Summa - .pdf".
+
+Copyright (c) 2024 vesal & ChatGPT. All rights reserved.
+"""
+
 VERSION = "1.0.2"
 
 
@@ -23,6 +33,13 @@ SAAJAT = (
 
 
 def uusi_nimi(polku):
+    """
+    Luo uuden nimen PDF-tiedostolle, jos se on elasku ja sen nimi ei ole
+    jo oikeassa muodossa.
+    :param polku: PDF-tiedoston polku.
+    :return: Uusi nimi, jos se on elasku ja sen nimi ei ole
+             jo oikeassa muodossa, muuten None.
+    """
     if not polku.is_file():
         return None
 

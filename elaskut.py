@@ -12,15 +12,17 @@ from taulukko_html import (
     muodosta_javascript, muodosta_css,
 )
 
+"""
+Luetaan kaikki Dansken elaskujen XML-tiedostot ./xml-hakemistosta
+ja elaskut ./pdf-hakemistosta
+ja muodostetaan niistä
+laskulista, joka kirjoitetaan HTML-muodossa ./laskut.html
+XML--tiedostoista tehdään vastaava html-tiedosto jonka
+voi avata taulukosta klikkaamalla.
+Laskuja voi etsiä ja suodattaa selaimessa.
 
-# ============================================================
-# Luetaan kaikki XML-tiedostot ./xml-hakemistosta
-# ja elaskut ./pdf-hakemistosta
-# ja muodostetaan niistä
-# laskulista, joka kirjoitetaan HTML-muodossa ./laskut.html
-# laskuja voi etsiä ja suodattaa selaimessa.
-# ============================================================
-
+Copyright (c) 2026 vesal & ChatGPT. All rights reserved.
+"""
 
 VERSION = "1.1.4"
 
@@ -38,6 +40,7 @@ TAULUKKO = TaulukkoAsetukset(
 
 
 XML_HAKEMISTO = Path("./xml")
+PDF_HAKEMISTO = Path("./pdf")
 HTML_HAKEMISTO = Path("./html")
 TULOSTIEDOSTO = Path("./laskut.html")
 SUMMA_SARAKE = 3
@@ -60,8 +63,8 @@ def muotoile_paiva(paiva):
     paiva voi olla muodossa DD.MM.YYYY tai YYYYMMDD.
     Muotoilu on tarpeen, koska Dansken E-laskuissa
     ostopäivä on DD.MM.YYYY, mutta tiedostonimessä on YYYY-MM-DD.
-    param: paiva: Päivämäärä merkkijonona.
-    return: Päivämäärä muodossa YYYY-MM-DD tai tyhjä merkkijono,
+    :param paiva: Päivämäärä merkkijonona.
+    :return: Päivämäärä muodossa YYYY-MM-DD tai tyhjä merkkijono,
             jos muotoilu ei onnistunut.
     """
     if not paiva:
@@ -86,8 +89,8 @@ def muotoile_paiva(paiva):
 def tagin_nimi(tag):
     """
     Palauttaa XML-tagista pelkän nimen ilman namespacea.
-    param: tag: XML-tag merkkijonona.
-    return: Tagin nimi ilman namespacea.
+    :param tag: XML-tag merkkijonona.
+    :return: Tagin nimi ilman namespacea.
     """
     return tag.rsplit("}", 1)[-1]
 
@@ -95,9 +98,9 @@ def tagin_nimi(tag):
 def etsi_elementti(element, nimi) -> Optional[eT.Element]:
     """
     Etsii XML:stä ensimmäisen annetun nimisen elementin.
-    param: element: XML-elementti.
-    param: nimi: Elementin nimi.
-    return: Etsitty elementti tai None, jos ei löydy.
+    :param element: XML-elementti.
+    :param nimi: Elementin nimi.
+    :return: Etsitty elementti tai None, jos ei löydy.
     """
     for child in element.iter():
         if tagin_nimi(child.tag) == nimi:
@@ -109,9 +112,9 @@ def etsi_elementti(element, nimi) -> Optional[eT.Element]:
 def etsi_teksti(element, nimi) -> str:
     """
     Etsii annetun nimisen XML-elementin tekstin.
-    param: element: XML-elementti.
-    param: nimi: Elementin nimi.
-    return: Elementin teksti tai tyhjä merkkijono, jos ei löydy
+    :param element: XML-elementti.
+    :param nimi: Elementin nimi.
+    :return: Elementin teksti tai tyhjä merkkijono, jos ei löydy
             tai tekstikenttä on tyhjä.
     """
     child = etsi_elementti(element, nimi)
@@ -125,8 +128,8 @@ def etsi_teksti(element, nimi) -> str:
 def korjaa_teksti(teksti):
     """
     Korjaa tunnetut XML:n tekstimuotovirheet.
-    param: teksti: Korjattava teksti.
-    return: Korjattu teksti.
+    :param teksti: Korjattava teksti.
+    :return: Korjattu teksti.
     """
     teksti = (teksti or "").strip()
 
@@ -139,8 +142,8 @@ def korjaa_teksti(teksti):
 def lue_summa(teksti):
     """
     Muuttaa summan numeroksi.
-    param: teksti: Summa merkkijonona, esim. "123,45" tai "123.45".
-    return: Summa float-tyyppisenä tai None, jos muunnos ei onnistunut.
+    :param teksti: Summa merkkijonona, esim. "123,45" tai "123.45".
+    :return: Summa float-tyyppisenä tai None, jos muunnos ei onnistunut.
     """
     if not teksti:
         return None
@@ -163,24 +166,24 @@ def pura_tiedostonimi(polku):
 
     Esimerkiksi:
 
-        2026-09-28 - Pohjola Vakuutus Oy -
-        Vakuutuslaskut ja re - 81.14 - .xml
-    param: polku: Tiedoston polku Path-objektina.
-    return: Tuple (paiva, saaja, aihe) merkkijonoina.
+        2026-09-28 - Pohjola Vakuutus Oy - Vakuutuslaskut - 81.14 - .xml
+    :param polku: Tiedoston polku Path-objektina.
+    :return: Tuple (paiva, saaja, aihe) merkkijonoina.
     """
 
-    stem = polku.stem.rstrip()
+    stem = polku.stem
 
     osat = stem.split(" - ")
 
-    if len(osat) < 3:
-        return "", stem, ""
+    if len(osat) < 5:
+        return "", stem, "", ""
 
     paiva = osat[0].strip()
     saaja = osat[1].strip()
     aihe = osat[2].strip()
+    summa = osat[3].strip()
 
-    return paiva, saaja, aihe
+    return paiva, saaja, aihe, summa
 
 
 # ============================================================
@@ -191,45 +194,28 @@ def lue_pdf_tiedostot():
     """Lukee ./pdf-hakemiston laskutiedostot."""
     """
     Lukee PDF-tiedostot ja palauttaa laskut tietorakenteessa.
-    return: Lista laskuista.
+    :return: Lista laskuista.
     """
 
     laskut = []
-
-    if not Path("./pdf").is_dir():
+    if not PDF_HAKEMISTO.is_dir():
         return laskut
 
-    for polku in sorted(Path("./pdf").iterdir()):
+    for polku in sorted(PDF_HAKEMISTO.iterdir()):
 
         # Hakemistot, kuten *_files, jätetään rauhaan.
         if not polku.is_file():
             continue
 
-        # Nimen pitää alkaa päivämäärällä.
-        osat = polku.stem.split(" - ")
+        paiva, saaja, aihe, summa_teksti = pura_tiedostonimi(polku)
 
-        if len(osat) < 5:
+        if not paiva or not saaja or not summa_teksti:
             continue
-
-        paiva = osat[0].strip()
-        saaja = osat[1].strip()
-
-        # Summa on toiseksi viimeinen osa.
-        summa_teksti = osat[-2].strip()
-
-        # Aihe voi sisältää " - " -erottimia.
-        aihe = " - ".join(
-            osa.strip()
-            for osa in osat[2:-2]
-        )
 
         summa = lue_summa(summa_teksti)
 
-        if not paiva or not saaja:
-            continue
-
         # Linkki tehdään tiedostoon sellaisenaan.
-        tiedosto = (Path("pdf") / polku.name).as_posix()
+        tiedosto = (PDF_HAKEMISTO / polku.name).as_posix()
 
         laskut.append(
             {
@@ -248,23 +234,26 @@ def lue_pdf_tiedostot():
 # Laskujen lukeminen
 # ============================================================
 
-def lue_laskut():
+def lue_xml_tiedostot():
     """
     Lukee XML-tiedostot ja palauttaa laskut tietorakenteessa.
-    return: Lista laskuista.
+    XML-tiedostoista tehdään myös HTML-tiedostot ./html-hakemistoon.
+    XML-tiedostoista luetaan laskurivit, joista muodostetaan laskulista.
+    XML- tiedostoissa voi olla Dansken korttiostoja,
+    joista tehdään omat laskurivit ja silloin itse tiedoston summa
+    merkitään tähdellä, jotta se erottuu muista riveistä ja oletuksena
+    *-riviä ei lasketa mukaan summaksi koko taulukosta.  Mutta
+    jos taulukon hakuehdossa *-alussa, niin silloin *-merkitty summa
+    lasketaan mukaan summaksi.
+    :return: Lista laskuista.
     """
     laskut = []
 
-    xml_tiedostot = sorted(
-        XML_HAKEMISTO.glob("*.xml"),
-        key=lambda p: p.name.lower(),
-    )
+    xml_tiedostot = sorted(XML_HAKEMISTO.glob("*.xml"), key=lambda p: p.name.lower())
 
     for polku in xml_tiedostot:
-
         try:
             juuri = eT.parse(polku).getroot()
-
         except Exception as e:
             print(f"XML-virhe tiedostossa {polku.name}: {e}")
             continue
@@ -273,9 +262,9 @@ def lue_laskut():
         # Tee tästä XML:stä luettava HTML-näkymä.
         # ----------------------------------------------------
 
-        html_polku = tee_lasku_html(polku, HTML_HAKEMISTO,)
+        html_polku = tee_lasku_html(polku, HTML_HAKEMISTO)
 
-        filename_paiva, filename_saaja, filename_aihe = (pura_tiedostonimi(polku))
+        filename_paiva, filename_saaja, filename_aihe, _ = pura_tiedostonimi(polku)
 
         seller_name = korjaa_teksti(
             etsi_teksti(juuri, "SellerOrganisationName")
@@ -385,14 +374,13 @@ def lue_laskut():
         elasku_rivi = None
 
         if onko_danske:
-
             for rivi in rivit:
-
                 if rivi["article_name"] == "E-lasku":
                     elasku_rivi = rivi
                     break
 
         if elasku_rivi is not None and invoice_total is not None:
+            # Korttiostoja kuvaava XML-tiedosto
 
             aihe = filename_aihe
 
@@ -406,11 +394,8 @@ def lue_laskut():
                     "paiva": filename_paiva,
                     "saaja": filename_saaja,
                     "aihe": aihe,
-                    "summa": f"*{invoice_total:.2f}",
-                    "tiedosto": (
-                        Path("html")
-                        / html_polku.name
-                    ).as_posix(),
+                    "summa": f"*{rahaksi(invoice_total)}",
+                    "tiedosto": (HTML_HAKEMISTO / html_polku.name).as_posix(),
                 }
             )
 
@@ -419,7 +404,6 @@ def lue_laskut():
         # ----------------------------------------------------
 
         for rivi in rivit:
-
             article_name = rivi["article_name"]
 
             # Dansken E-lasku-rivi käsiteltiin jo yllä.
@@ -427,7 +411,6 @@ def lue_laskut():
                 continue
 
             summa = rivi["summa"]
-
             saaja = filename_saaja
 
             if onko_danske and rivi["ostopaiva"]:
@@ -455,10 +438,7 @@ def lue_laskut():
                     "saaja": saaja,
                     "aihe": aihe,
                     "summa": summa,
-                    "tiedosto": (
-                        Path("html")
-                        / html_polku.name
-                    ).as_posix(),
+                    "tiedosto": (HTML_HAKEMISTO / html_polku.name).as_posix(),
                 }
             )
 
@@ -469,11 +449,7 @@ def lue_laskut():
     laskut.extend(lue_pdf_tiedostot())
 
     # Uusin laskurivi ensin.
-    return sorted(
-        laskut,
-        key=lambda x: x["paiva"],
-        reverse=True,
-    )
+    return sorted(laskut, key=lambda x: x["paiva"], reverse=True)
 
 
 # ============================================================
@@ -483,8 +459,8 @@ def lue_laskut():
 def h(text):
     """
     HTML-escape.
-    param: text: Merkkijono, joka halutaan escape:ata.
-    return: Escape:attu merkkijono.
+    :param text: Merkkijono, joka halutaan escape:ata.
+    :return: Escape:attu merkkijono.
     """
     return html.escape(str(text or ""))
 
@@ -492,8 +468,8 @@ def h(text):
 def rahaksi(summa):
     """
     Muuttaa summan kahden desimaalin tekstiksi.
-    param: summa: Summa float-tyyppisenä.
-    return: Summa kahden desimaalin tekstiksi.
+    :param summa: Summa float-tyyppisenä.
+    :return: Summa kahden desimaalin tekstiksi.
     """
     if summa is None:
         return ""
@@ -508,8 +484,8 @@ def rahaksi(summa):
 def muodosta_html(laskut):
     """
     Muodostaa laskulistan HTML-muotoon.
-    param: laskut: Lista laskuista.
-    return: HTML-koodi.
+    :param laskut: Lista laskuista.
+    :return: HTML-koodi.
     """
     otsikot, leveydet = muodosta_taulukko(TAULUKKO)
 
@@ -524,7 +500,7 @@ def muodosta_html(laskut):
             data_value = summa[1:]
         else:
             summa_html = rahaksi(summa)
-            data_value = f"{summa:.2f}"
+            data_value = summa_html
 
         rivit.append([
             {
@@ -569,9 +545,12 @@ def muodosta_html(laskut):
 </style>
 </head>
 <body>
-<div id="maara">
-    <span id="laskurivimaara"></span>
-    <span id="summa"></span>
+<h1>E-laskut</h1>
+<div class="sticky-header">
+    <div id="maara">
+        <span id="laskurivimaara"></span>
+        <span id="summa"></span>
+    </div>
 </div>
 <table id="laskut">
 <thead>
@@ -604,7 +583,7 @@ def main():
     print(Path.cwd())
     print()
 
-    laskut = lue_laskut()
+    laskut = lue_xml_tiedostot()
 
     print()
     print(f"Luettu {len(laskut)} laskuriviä.")
