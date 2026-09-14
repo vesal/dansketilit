@@ -2,7 +2,7 @@
 
 SetTitleMatchMode 2
 
-latauskansio := "E:\oma\vesa\tilit\2026\xml_koe"
+latauskansio := "E:\oma\vesa\tilit\2026\pdf"
 
 tallennetut := 0
 

@@ -3,7 +3,7 @@
 // @namespace    https://danskebank.fi/
 // @version      1.2
 // @description  Vastaanottaa tiedostonimen ja lataa Dansken e-laskun XML:n
-// @match        https://verkkopankki.danskebank.fi/*
+// @match        https://verkkopankki.danskebank.fi/SP/e-invoice.xml*
 // @grant        none
 // ==/UserScript==
 
