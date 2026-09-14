@@ -16,8 +16,11 @@ function kaynnista() {
     console.log("DANSKE XML BULK 14.3");
     console.log("========================================");
 
-    const BANK_ORIGIN = "https://verkkopankki.danskebank.fi";
-    const LIST_ORIGIN = "https://verkkopankki2.danskebank.fi";
+    const BANK_ORIGIN =
+        "https://verkkopankki.danskebank.fi";
+
+    const LIST_ORIGIN =
+        "https://verkkopankki2.danskebank.fi";
 
 
     // ------------------------------------------------------------
@@ -706,13 +709,8 @@ function kaynnista() {
             return;
         }
         const sivu = haeSivunumero(frame);
-        if (!sivu) {
-            alert("Dansken sivunumeroa ei löytynyt.");
-            return;
-        }
-
-        const ensimmainenSivu = sivu.nykyinen;
-        const viimeinenSivu = sivu.yhteensa;
+        const ensimmainenSivu = sivu ? sivu.nykyinen : 1;
+        const viimeinenSivu = sivu ? sivu.yhteensa : 1;
 
         if (!confirm("Tallennetaanko kaikki XML-e-laskut?\n\nSivuja: " + viimeinenSivu)) {
             console.log("XML BULK: käyttäjä peruutti.");
@@ -734,16 +732,14 @@ function kaynnista() {
             await new Promise(resolve => setTimeout(resolve, 500));
 
             const nykyinen = haeSivunumero(frame);
-            if (!nykyinen) {
-                console.error("Sivunumeroa ei enää löytynyt.");
-                break;
-            }
+            const nykyinenSivu = nykyinen ? nykyinen.nykyinen : 1;
+            const nykyinenYhteensa = nykyinen ? nykyinen.yhteensa : 1;
 
             console.log("");
-            console.log(`SIVU ${nykyinen.nykyinen}/${nykyinen.yhteensa}`);
+            console.log(`SIVU ${nykyinenSivu}/${nykyinenYhteensa}`);
             const laskut = haeLaskut(frame);
             laskujaYhteensa += laskut.length;
-            console.log(`Sivulla ${nykyinen.nykyinen}/${nykyinen.yhteensa} ${laskut.length} XML-laskua.`);
+            console.log(`Sivulla ${nykyinenSivu}/${nykyinenYhteensa} ${laskut.length} XML-laskua.`);
 
             for (let i = 0; i < laskut.length; i++) {
                 const onnistui =
@@ -758,7 +754,7 @@ function kaynnista() {
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
 
-            if (nykyinen.nykyinen >= viimeinenSivu) {
+            if (nykyinenSivu >= viimeinenSivu) {
                 break;
             }
 
