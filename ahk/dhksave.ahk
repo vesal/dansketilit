@@ -2,7 +2,7 @@
 
 SetTitleMatchMode 2
 
-latauskansio := "E:\oma\vesa\tilit\2026\elaskut\pdf"
+latauskansio := "E:\oma\vesa\tilit\2026\xml_koe"
 
 tallennetut := 0
 
@@ -198,7 +198,29 @@ Loop
 
     Sleep(500)
 
-	A_Clipboard := fileName
+	; Ehdotettu nimi leikepöydälle jotta saadaan ehdotettu tarkennin
+	Send("^c")
+    Sleep(100)
+	
+	oletusNimi := A_Clipboard
+	tarkennin := ""
+	if RegExMatch(oletusNimi, "\.[^.]+$", &osuma)
+	{
+		tarkennin := osuma[0]
+	}
+	
+	; Muodostetaan oma nimi niin, että erotin " - "
+	; säilyy ennen päätettä.
+	uusiNimi := fileName . " " . tarkennin
+	tiedosto := latauskansio "\" uusiNimi
+
+	A_Clipboard := tiedosto
+
+	if FileExist(tiedosto)
+	{
+		FileDelete(tiedosto)
+	}
+	
 	Sleep(100)
 	Send("^v")
 	Sleep(300)
@@ -210,31 +232,28 @@ Loop
 
     valmis := false
 
-    Loop 40
-    {
-        hakumaski := latauskansio "\" fileName ".*"
+	tiedosto := latauskansio "\" uusiNimi
+	A_Clipboard := tiedosto
 
-        if DirExist(latauskansio)
-        {
-            Loop Files, hakumaski, "F"
-            {
-                valmis := true
-                break
-            }
-        }
+	Loop 40
+	{
+		if FileExist(tiedosto)
+		{
+			valmis := true
+			break
+		}
 
-        if (valmis)
-            break
-
-        Sleep(500)
-    }
+		Sleep(500)
+	}
 
     if (!valmis)
     {
         MsgBox(
             "Tiedostoa ei löytynyt tallennuksen jälkeen." .
             "`n`nOdotettu nimi:" .
-            "`n" fileName
+            "`n[" fileName "]"
+            "`n[" uusiNimi "]"
+            "`n[" tiedosto "]"
         )
         ExitApp
     }
