@@ -1,6 +1,7 @@
 from pathlib import Path
 import re
 from datetime import datetime
+import zipfile
 
 from pypdf import PdfReader
 
@@ -17,7 +18,9 @@ Copyright (c) 2026 vesal & ChatGPT. All rights reserved.
 VERSION = "1.0.0"
 
 # PDF-tiedostot tästä hakemistosta
-HAKEMISTO = Path(".")
+ARKISTOPATH = Path("arkisto")
+
+OTTEET_PATH = Path("otteet")
 
 
 def lue_pdf_teksti(pdf_tiedosto: Path) -> str:
@@ -104,25 +107,37 @@ def hae_tiedot(teksti: str) -> tuple[str, str] | None:
     :return: Päivämäärä muodossa YYYY-MM-DD ja IBAN,
              tai None jos tietoja ei löydy.
      """
-    pvm_osuma = re.search( r"Ajalta\s+(\d{2}\.\d{2}\.\d{4})" r"\s*-\s*\d{2}\.\d{2}\.\d{4}", teksti, re.IGNORECASE, )
+    pvm_osuma = re.search(r"Ajalta\s+(\d{2}\.\d{2}\.\d{4})" r"\s*-\s*\d{2}\.\d{2}\.\d{4}", teksti, re.IGNORECASE, )
     tilinumero = hae_tilinumero(teksti)
     if not pvm_osuma or not tilinumero:
         return None
-    pvm = datetime.strptime( pvm_osuma.group(1), "%d.%m.%Y", ).strftime("%Y-%m-%d")
+    pvm = datetime.strptime(pvm_osuma.group(1), "%d.%m.%Y", ).strftime("%Y-%m-%d")
     return pvm, tilinumero
 
 
-def main() -> None:
+def pura_ja_nimea() -> None:
+    """
+    Puretaan mahdollinen *.zip ensin, jotta Tiliote-alkuiset PDF-tiedostot löytyvät.
+    Sitten nimetään Tiliote-alkuiset PDF-tiedostot uudelleen
+    """
+
+    for zip_tiedosto in ARKISTOPATH.glob("*.zip"):
+        print(f"Puretaan {zip_tiedosto}")
+        with zipfile.ZipFile(zip_tiedosto) as z:
+            z.extractall(zip_tiedosto.parent)
+
+        zip_tiedosto.unlink()
+
     """
     Nimeää Tiliote-alkuiset PDF-tiedostot uudelleen PDF:n sisällön perusteella.
     """
     pdf_tiedostot = sorted(
         p
-        for p in HAKEMISTO.iterdir()
+        for p in ARKISTOPATH.iterdir()
         if (
             p.is_file()
             and p.suffix.lower() == ".pdf"
-            and p.name.startswith("Tiliote")
+            and re.search(r"\bTiliote\b", p.name)
         )
     )
 
@@ -143,12 +158,13 @@ def main() -> None:
 
             uusi_nimi = f"{pvm} - Tiliote - {tilinumero} - .pdf"
 
-            uusi_tiedosto = pdf.with_name(uusi_nimi)
+            uusi_tiedosto = OTTEET_PATH / uusi_nimi
 
             if uusi_tiedosto == pdf:
                 # print(f"ENNALLAAN: {pdf.name}")
                 continue
 
+            OTTEET_PATH.mkdir(parents=True, exist_ok=True)
             if uusi_tiedosto.exists():
                 print(f"ON JO: {pdf.name} -> {uusi_tiedosto.name} -> TARKISTA!")
                 continue
@@ -159,6 +175,13 @@ def main() -> None:
 
         except Exception as e:
             print(f"VIRHE: {pdf.name}: {e}")
+
+
+def main():
+    print(f"nimea_tiliote_pvm_mukaan.py v{VERSION}")
+    print()
+
+    pura_ja_nimea()
 
 
 if __name__ == "__main__":

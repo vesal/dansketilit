@@ -214,7 +214,9 @@ def muodosta_css(asetukset: TaulukkoAsetukset) -> str:
     .tyhjenna:hover {{
         color: #000;
     }}    
-
+    #kaikki {{
+        cursor: pointer;
+    }}
 {leveydet}
 {tasaukset}
     """

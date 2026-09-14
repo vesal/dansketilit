@@ -17,7 +17,7 @@ Luetaan kaikki Dansken elaskujen XML-tiedostot ./xml-hakemistosta
 ja elaskut ./pdf-hakemistosta
 ja muodostetaan niistä
 laskulista, joka kirjoitetaan HTML-muodossa ./laskut.html
-XML--tiedostoista tehdään vastaava html-tiedosto jonka
+XML--tiedostoista tehdään vastaava html-tiedosto html-hakemistoon, jonka
 voi avata taulukosta klikkaamalla.
 Laskuja voi etsiä ja suodattaa selaimessa.
 
@@ -505,7 +505,7 @@ def muodosta_html(laskut):
         rivit.append([
             {
                 "html": (
-                    f'<a href="{h(lasku["tiedosto"])}">'
+                    f'<a href="{h(lasku["tiedosto"])}" target="_blank">'
                     f'{h(lasku["paiva"])}'
                     f'</a>'
                 ),

@@ -3,6 +3,7 @@ import re
 import html
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
+from nimea_tiliote_pvm_mukaan import pura_ja_nimea
 
 from taulukko_html import (
     TaulukkoAsetukset,
@@ -15,7 +16,12 @@ from taulukko_html import (
 """
 Tiliotteiden käsittely
 
-Luetaan tiliotteiden PDF-tiedostot ja muodostetaan niistä HTML-taulukko.
+Aluksi puretaan mahdolliset arkisto/*.zip, jotta 
+"* Tiliote"-alkuiset PDF-tiedostot löytyvät.
+Tiedoston nimetää uudelleen PDF:n sisällön perusteella, 
+ha sirrtetään otteet-hakemistoon. 
+otteet-hakemistosta Luetaan tiliotteiden PDF-tiedostot
+ja muodostetaan niistä HTML-taulukko.
 Tiedoston nimi pitää sisältää Tiliote ja sisältää tilinumeron (FI...)
 tai tiliotteen numeron (Tiliote 123-456).
 
@@ -23,7 +29,7 @@ Copyright (c) 2026 vesal & ChatGPT
 """
 
 
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 
 PDF_HAKEMISTO = Path("./otteet")
 TULOSTIEDOSTO = Path("./otteet.html")
@@ -429,6 +435,9 @@ def muodosta_html(tulokset: list[dict]) -> None:
 
 def main():
     print(f"Tiliotteet {VERSION}")
+
+    pura_ja_nimea()
+
     print(f"Lähde: {PDF_HAKEMISTO.resolve()}")
     tulokset = lue_tapahtumat()
     print(f"Löytyi {len(tulokset)} tapahtumaa")
